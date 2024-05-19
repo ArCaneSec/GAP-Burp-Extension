@@ -186,6 +186,7 @@ class BurpExtender(IBurpExtender, IContextMenuFactory, ITab):
         self.allScopePrefixes = set()
         self.param_list = set()
         self.paramUrl_list = set()
+        self.paramUrl_dict = dict()
         self.paramSus_list = set()
         self.paramSusUrl_list = set()
         self.susParamText = set()
@@ -487,9 +488,9 @@ class BurpExtender(IBurpExtender, IContextMenuFactory, ITab):
         self.cbParamFromLinks = self.defineCheckBox("Params from links found", False)
         self.cbParamsEnabled = self.defineCheckBox("Parameters", True)
         self.cbParamsEnabled.addItemListener(self.cbParamsEnabled_clicked)
-        self.cbLinksEnabled = self.defineCheckBox("Links", True)
+        self.cbLinksEnabled = self.defineCheckBox("Links", False)
         self.cbLinksEnabled.addItemListener(self.cbLinksEnabled_clicked)
-        self.cbWordsEnabled = self.defineCheckBox("Words", True)
+        self.cbWordsEnabled = self.defineCheckBox("Words", False)
         self.cbWordsEnabled.addItemListener(self.cbWordsEnabled_clicked)
 
         # Words sections
@@ -1289,52 +1290,54 @@ class BurpExtender(IBurpExtender, IContextMenuFactory, ITab):
         The event called when the "Links" check box is clicked
         """
         self.setTabDefaultColor()
-        if self.cbLinksEnabled.isSelected():
-            self.setEnabledLinkOptions(True)
-            self.lblLinkList.visible = True
-            self.cbInScopeOnly.visible = True
-            self.cbShowLinkOrigin.visible = True
-            self.scroll_outLinkList.visible = True
-            self.grpLinkFilter.visible = True
-            self.cbExclusions.visible = True
-            self.inExclusions.visible = True
-        else:
-            self.setEnabledLinkOptions(False)
-            self.lblLinkList.visible = False
-            self.cbInScopeOnly.visible = False
-            self.cbShowLinkOrigin.visible = False
-            self.scroll_outLinkList.visible = False
-            self.grpLinkFilter.visible = False
-            self.cbExclusions.visible = False
-            self.inExclusions.visible = False
-            # If no other mode is selected, reselect Params
-            if not self.cbParamsEnabled.isSelected() and not self.cbWordsEnabled.isSelected():
-                self.cbParamsEnabled.setSelected(True)
+        self.setEnabledLinkOptions(False)
+        # if self.cbLinksEnabled.isSelected():
+        #     self.setEnabledLinkOptions(True)
+        #     self.lblLinkList.visible = True
+        #     self.cbInScopeOnly.visible = True
+        #     self.cbShowLinkOrigin.visible = True
+        #     self.scroll_outLinkList.visible = True
+        #     self.grpLinkFilter.visible = True
+        #     self.cbExclusions.visible = True
+        #     self.inExclusions.visible = True
+        # else:
+            # self.setEnabledLinkOptions(False)
+        self.lblLinkList.visible = False
+        self.cbInScopeOnly.visible = False
+        self.cbShowLinkOrigin.visible = False
+        self.scroll_outLinkList.visible = False
+        self.grpLinkFilter.visible = False
+        self.cbExclusions.visible = False
+        self.inExclusions.visible = False
+        #     # If no other mode is selected, reselect Params
+        #     if not self.cbParamsEnabled.isSelected() and not self.cbWordsEnabled.isSelected():
+        #         self.cbParamsEnabled.setSelected(True)
             
     def cbWordsEnabled_clicked(self, e=None):
         """
         The event called when the "Words" check box is clicked
         """
         self.setTabDefaultColor()
-        if self.cbWordsEnabled.isSelected():
-            self.setEnabledWordOptions(True)
-            self.lblWordList.visible = True
-            self.cbShowWordOrigin.visible = True
-            self.scroll_outWordList.visible = True
-            self.lblStopWords.visible = True
-            self.inStopWords.visible = True
-            if WORDLIST_IMPORT_ERROR != "":
-                self.lblWordList.text = "Words found - UNAVAILABLE:"
-        else:
-            self.setEnabledWordOptions(False)
-            self.lblWordList.visible = False
-            self.cbShowWordOrigin.visible = False
-            self.scroll_outWordList.visible = False
-            self.lblStopWords.visible = False
-            self.inStopWords.visible = False
-            # If no other mode is selected, reselect Links
-            if not self.cbParamsEnabled.isSelected() and not self.cbLinksEnabled.isSelected():
-                self.cbLinksEnabled.setSelected(True)
+        self.setEnabledWordOptions(False)
+        # if self.cbWordsEnabled.isSelected():
+        #     self.setEnabledWordOptions(True)
+        #     self.lblWordList.visible = True
+        #     self.cbShowWordOrigin.visible = True
+        #     self.scroll_outWordList.visible = True
+        #     self.lblStopWords.visible = True
+        #     self.inStopWords.visible = True
+        #     if WORDLIST_IMPORT_ERROR != "":
+        #         self.lblWordList.text = "Words found - UNAVAILABLE:"
+        # else:
+        #     self.setEnabledWordOptions(False)
+        self.lblWordList.visible = False
+        self.cbShowWordOrigin.visible = False
+        self.scroll_outWordList.visible = False
+        self.lblStopWords.visible = False
+        self.inStopWords.visible = False
+        #     # If no other mode is selected, reselect Links
+        #     if not self.cbParamsEnabled.isSelected() and not self.cbLinksEnabled.isSelected():
+        #         self.cbLinksEnabled.setSelected(True)
                 
     def getTabCaption(self):
         return "GAP"
@@ -1399,7 +1402,11 @@ class BurpExtender(IBurpExtender, IContextMenuFactory, ITab):
                     if self.cbShowSusParams.isSelected():
                         self.outParamList.text = self.txtParamsSusWithURL
                     else:
-                        self.outParamList.text = self.txtParamsWithURL
+                        # self.outParamList.text = self.txtParamsWithURL
+                        self.outParamList.text = ""
+                        for origin, params in self.paramUrl_dict.items():
+                            self.outParamList.text += "%s: %s\n" % (origin, ", ".join(params))
+
                     self.scroll_outParamList.setViewportView(self.outParamList)
                     self.cbShowQueryString.setSelected(False)
                 else:
@@ -1439,12 +1446,22 @@ class BurpExtender(IBurpExtender, IContextMenuFactory, ITab):
                             if self.cbShowSusParams.isSelected():
                                 self.outParamList.text = self.txtParamsSusWithURL
                             else:
-                                self.outParamList.text = self.txtParamsWithURL
+                                # self.outParamList.text = self.txtParamsWithURL
+                                self.outParamList.text = ""
+                                for origin, params in self.paramUrl_dict.items():
+                                    self.outParamList.text += "%s: %s\n" % (origin, ", ".join(params))
+
                         else:
                             if self.cbShowSusParams.isSelected():
                                 self.outParamList.text = self.txtParamsSusOnly
                             else:
-                                self.outParamList.text = self.txtParamsOnly
+                                # self.outParamList.text = self.txtParamsOnly
+                                allParams = set()
+                                for params in self.paramUrl_dict.values():
+                                    allParams.update(params)
+
+                                self.outParamList.text = "\n".join(allParams)
+
                         self.scroll_outParamList.setViewportView(self.outParamList)
                 
                 # Change the number of params in the "Potential param found" label depending if a filter is in place
@@ -1472,8 +1489,7 @@ class BurpExtender(IBurpExtender, IContextMenuFactory, ITab):
                         )
                     
                 # Reposition the display of the Param list to the start
-                self.outParamList.setCaretPosition(0)
-
+                self.outParamList.setCaretPosition(0)                
         except Exception as e:
             self._stderr.println("changeParamDisplay 1")
             self._stderr.println(e)
@@ -1691,6 +1707,7 @@ class BurpExtender(IBurpExtender, IContextMenuFactory, ITab):
         It will enable/disable all options relating to Links.
         """
         # Enable/disable all Link options
+        enabled = False
         try:
             self.cbSiteMapEndpoints.setEnabled(enabled)
             self.cbRelativeLinks.setEnabled(enabled)
@@ -1735,6 +1752,7 @@ class BurpExtender(IBurpExtender, IContextMenuFactory, ITab):
         It will enable/disable all options relating to Words.
         """
         # Enable/disable all Words options
+        enabled = False
         try:
             self.cbWordParams.setEnabled(enabled)
             self.cbWordComments.setEnabled(enabled)
@@ -1763,9 +1781,9 @@ class BurpExtender(IBurpExtender, IContextMenuFactory, ITab):
         if _debug:
             print("setEnabledAll started")
         try:
-            self.cbLinksEnabled.setEnabled(enable)
+            self.cbLinksEnabled.setEnabled(False)
             self.cbParamsEnabled.setEnabled(enable)
-            self.cbWordsEnabled.setEnabled(enable)
+            self.cbWordsEnabled.setEnabled(False)
             if self.cbParamsEnabled.isSelected():
                 self.setEnabledParamOptions(enable)
             if self.cbLinksEnabled.isSelected():
@@ -2363,6 +2381,7 @@ class BurpExtender(IBurpExtender, IContextMenuFactory, ITab):
             self.paramSusUrl_list.clear()
             self.susParamText.clear()
             self.susParamIssue.clear()
+            self.paramUrl_dict.clear()
             self.txtParamsOnly = ""
             self.txtParamsWithURL = ""
             self.txtParamsSusOnly = ""
@@ -3108,23 +3127,23 @@ class BurpExtender(IBurpExtender, IContextMenuFactory, ITab):
                 tParam.daemon = True
                 tParam.start()
 
-            if self.cbLinksEnabled.isSelected():
-                tLinks = threading.Thread(target=self.displayLinks)
-                tLinks.daemon = True
-                tLinks.start()
+            # if self.cbLinksEnabled.isSelected():
+            #     tLinks = threading.Thread(target=self.displayLinks)
+            #     tLinks.daemon = True
+            #     tLinks.start()
             
-            if self.cbWordsEnabled.isSelected():
-                tWords = threading.Thread(target=self.displayWords)
-                tWords.daemon = True
-                tWords.start()
+            # if self.cbWordsEnabled.isSelected():
+            #     tWords = threading.Thread(target=self.displayWords)
+            #     tWords.daemon = True
+            #     tWords.start()
             
             # Join threads so we don't continue until they all finish
             if self.cbParamsEnabled.isSelected():
                 tParam.join()
-            if self.cbLinksEnabled.isSelected():
-                tLinks.join()
-            if self.cbWordsEnabled.isSelected():
-                tWords.join()
+            # if self.cbLinksEnabled.isSelected():
+            #     tLinks.join()
+            # if self.cbWordsEnabled.isSelected():
+            #     tWords.join()
 
         except Exception as e:
             self._stderr.println("displayResults 1")
@@ -3144,19 +3163,20 @@ class BurpExtender(IBurpExtender, IContextMenuFactory, ITab):
 
                 self.lblParamList.text = "Potential params found - UPDATING"
                 self.outParamList.text = "UPDATING..."
-                self.countParam = len(self.param_list)
+                self.countParam = len(self.paramUrl_dict)
                 self.countParamSus = len(self.paramSus_list)
                 self.countParamSusUnique = len(self.paramSusUrl_list)
-                self.countParamUnique = len(self.paramUrl_list)
+                self.countParamUnique = len(self.paramUrl_dict)
                 self.txtDebug.text = "Displaying Potential params found..."
                 
                 # De-dupe the lists
-                self.txtParamsOnly = "\n".join(sorted(self.param_list))
-                self.txtParamsWithURL = "\n".join(sorted(self.paramUrl_list))
-                self.txtParamsSusOnly = "\n".join(sorted(self.paramSus_list))
-                self.txtParamsSusWithURL = "\n".join(sorted(self.paramSusUrl_list))
+                # self.txtParamsOnly = "\n".join(sorted(self.param_list))
+                # self.txtParamsWithURL = "\n".join(sorted(self.paramUrl_list))
+                # self.txtParamsSusOnly = "\n".join(sorted(self.paramSus_list))
+                # self.txtParamsSusWithURL = "\n".join(sorted(self.paramSusUrl_list))
                 
-                if self.txtParamsOnly == "":
+                # if self.txtParamsOnly == "":
+                if len(self.paramUrl_dict) == 0:
                     # If the context is Site Map Tree then there may be no results if Scope isn't set
                     extraInfo = ''
                     if LAST_RUN_CONTEXT == 4:
@@ -3169,12 +3189,21 @@ class BurpExtender(IBurpExtender, IContextMenuFactory, ITab):
                         if self.cbShowSusParams.isSelected():
                             self.outParamList.text = self.txtParamsSusWithURL
                         else:
-                            self.outParamList.text = self.txtParamsWithURL
+                            # self.outParamList.text = self.txtParamsWithURL
+                            self.outParamList.text = ""
+                            for origin, params in self.paramUrl_dict.items():
+                                self.outParamList.text += "%s: %s\n" % (origin, ", ".join(params))
+
                     else:
                         if self.cbShowSusParams.isSelected():
                             self.outParamList.text = self.txtParamsSusOnly
                         else:
-                            self.outParamList.text = self.txtParamsOnly
+                            # self.outParamList.text = self.txtParamsOnly
+                            allParams = set()
+                            for params in self.paramUrl_dict.values():
+                                allParams.update(params)
+
+                            self.outParamList.text = "\n".join(allParams)
 
                 # Show the version that is selected
                 self.cbShowSusParams.setSelected(False)
@@ -3219,7 +3248,8 @@ class BurpExtender(IBurpExtender, IContextMenuFactory, ITab):
             self.checkIfCancel()
             if self.cbSaveFile.isSelected():
                 self.progBar.setString("Writing files...")
-                self.fileWriteParams()
+
+                self.writeParams()
 
             # Clean up
             self.paramUrl_list.clear()
@@ -3235,6 +3265,21 @@ class BurpExtender(IBurpExtender, IContextMenuFactory, ITab):
 
         # Change progress bar
         self.progBar.setValue(self.progBar.getValue()+1)
+
+    def writeParams(self):
+        fileName = os.path.expanduser(self.getMainFilePath() + "_params.txt")
+
+        with open(fileName, "w") as file:
+            if self.cbShowParamOrigin.isSelected():
+                for origin, params in self.paramUrl_dict.items():
+                    file.write("%s: %s\n" % (origin, ','.join(params)))
+            else:
+                uniqueParams = set()
+
+                for params in self.paramUrl_dict.values():
+                    uniqueParams.update(params)
+
+                file.write("\n".join(uniqueParams))
         
     def displayLinks(self):
         """
@@ -4770,8 +4815,16 @@ class BurpExtender(IBurpExtender, IContextMenuFactory, ITab):
                     self.checkSusParams(param, confidence, context)
                     
                     #origin = self.removeStdPort(origin)
-                    self.param_list.add(param)
-                    self.paramUrl_list.add(param + "  [" + origin + "]")
+                    # self.param_list.add(param)
+                    # self.paramUrl_list.add(param + "  [" + origin + "]")
+
+                    currentParams = self.paramUrl_dict.get(origin)
+                    if currentParams is None:
+                        currentParams = set()
+                        currentParams.add(param)
+                        self.paramUrl_dict[origin] = currentParams
+                    else:
+                        currentParams.add(param)
 
                     # If the Words option is checked and the Include parameters is also checked, add the parameter to the word list
                     if self.cbWordsEnabled.isSelected() and self.cbWordParams.isSelected():
